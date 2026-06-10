@@ -21,7 +21,7 @@ from pathlib import Path
 from dagster import AssetExecutionContext, Definitions, asset
 
 from wc2026 import config, seed
-from wc2026.ingestion import fbref
+from wc2026.ingestion import fbref, transfermarkt
 
 DBT_DIR = config.PROJECT_ROOT / "dbt"
 
@@ -76,7 +76,18 @@ def raw_player_stats(context: AssetExecutionContext) -> None:
     context.log.info(f"Loaded {n} player-stat rows into raw_player_stats")
 
 
-@asset(deps=[raw_matches, raw_squads, raw_team_info, raw_player_stats])
+@asset(deps=[raw_squads])
+def raw_player_values(context: AssetExecutionContext) -> None:
+    """Ingest player market values + photos from Transfermarkt (depends on squads for team list)."""
+    con = config.connect()
+    try:
+        n = transfermarkt.load_player_values(con)
+    finally:
+        con.close()
+    context.log.info(f"Loaded {n} market-value rows into raw_player_values")
+
+
+@asset(deps=[raw_matches, raw_squads, raw_team_info, raw_player_stats, raw_player_values])
 def dbt_marts(context: AssetExecutionContext) -> None:
     """Build dbt staging + marts models on top of the raw tables."""
     # Pass an absolute DB path so dbt doesn't resolve a relative path against
@@ -102,5 +113,12 @@ def dbt_marts(context: AssetExecutionContext) -> None:
 
 
 defs = Definitions(
-    assets=[raw_matches, raw_squads, raw_team_info, raw_player_stats, dbt_marts]
+    assets=[
+        raw_matches,
+        raw_squads,
+        raw_team_info,
+        raw_player_stats,
+        raw_player_values,
+        dbt_marts,
+    ]
 )

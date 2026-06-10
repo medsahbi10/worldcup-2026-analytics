@@ -31,6 +31,12 @@ models:
       - name: player_name
         tests: [not_null]
 
+  - name: team_market_value
+    description: Per-team squad market value (Transfermarkt) + most valuable player.
+    columns:
+      - name: team_country
+        tests: [unique, not_null]
+
   - name: dim_team
     description: National teams appearing in match data.
     columns:

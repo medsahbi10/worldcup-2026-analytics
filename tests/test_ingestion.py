@@ -1,5 +1,5 @@
 from wc2026 import config, seed
-from wc2026.ingestion import fbref
+from wc2026.ingestion import fbref, transfermarkt
 
 
 def test_norm_reconciles_team_name_variants():
@@ -21,6 +21,14 @@ def test_parse_squad_finds_roster_table():
     assert list(df["player_name"]) == ["Test Player"]
     assert df["team"].iloc[0] == "Testland"
     assert df["age_years"].iloc[0] == 27
+
+
+def test_parse_transfermarkt_value():
+    assert transfermarkt._parse_value("€100.00m") == 100_000_000
+    assert transfermarkt._parse_value("€700k") == 700_000
+    assert transfermarkt._parse_value("€1.20bn") == 1_200_000_000
+    assert transfermarkt._parse_value("-") is None
+    assert transfermarkt._parse_value(None) is None
 
 
 def test_offline_seeds_populate_all_raw_tables(monkeypatch, tmp_path):

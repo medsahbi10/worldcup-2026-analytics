@@ -52,7 +52,7 @@ with st.sidebar:
         "raw_squads": "Squads (raw)",
         "dim_player": "Players (dim)",
         "dim_national_team": "Teams (dim)",
-        "team_squad_summary": "Team profiles",
+        "team_market_value": "Market values",
         "fct_player_stats": "Hist. stats (mart)",
         "fct_match": "Matches",
     }
@@ -72,7 +72,15 @@ with tab_overview:
         c1.metric("Players", len(players))
         c2.metric("Teams", players["team_country"].nunique())
         c3.metric("Avg age", round(players["age"].mean(), 1))
-        c4.metric("Clubs represented", players["club"].nunique())
+        if "market_value_eur" in players and players["market_value_eur"].notna().any():
+            c4.metric("Total squad value", f"€{players['market_value_eur'].sum() / 1e9:.1f}bn")
+            mvp = players.loc[players["market_value_eur"].idxmax()]
+            st.caption(
+                f"💎 Most valuable: **{mvp['player_name']}** ({mvp['team_country']}) — "
+                f"€{mvp['market_value_eur'] / 1e6:.0f}m"
+            )
+        else:
+            c4.metric("Clubs represented", players["club"].nunique())
         if table_exists("dim_national_team"):
             st.subheader("Qualified teams by confederation")
             conf = q(
@@ -99,6 +107,13 @@ with tab_teams:
         )
         st.subheader("Average squad age")
         st.bar_chart(view.set_index("team_country")["avg_age"])
+
+        if table_exists("team_market_value"):
+            st.subheader("Most valuable squads (€m, Transfermarkt)")
+            mv = q("select team_country, total_value_m, top_player, top_player_value_m "
+                   "from team_market_value order by total_value_m desc")
+            st.bar_chart(mv.set_index("team_country")["total_value_m"])
+            st.dataframe(mv, use_container_width=True, hide_index=True)
     else:
         st.info("Team squad profiles not built yet.")
 
@@ -114,10 +129,21 @@ with tab_players:
             view = view[view["team_country"] == team]
         if pos != "All":
             view = view[view["primary_position"] == pos]
+        has_value = "market_value_eur" in view and view["market_value_eur"].notna().any()
+        if has_value:
+            view = view.sort_values("market_value_eur", ascending=False, na_position="last")
+            view = view.assign(value_m=(view["market_value_eur"] / 1e6).round(1))
         st.caption(f"{len(view)} players")
+        cols = ["photo_url", "player_name", "team_country", "position", "age", "club"]
+        cols += ["value_m"] if has_value else []
+        cols = [c for c in cols if c in view.columns]
         st.dataframe(
-            view[["player_name", "team_country", "shirt_number", "position", "age", "club"]],
+            view[cols],
             use_container_width=True, hide_index=True,
+            column_config={
+                "photo_url": st.column_config.ImageColumn("Photo"),
+                "value_m": st.column_config.NumberColumn("Value (€m)", format="%.1f"),
+            },
         )
         c1, c2 = st.columns(2)
         c1.subheader("Top clubs by players selected")

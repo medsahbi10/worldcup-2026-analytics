@@ -30,3 +30,11 @@ models:
     columns:
       - name: team_country
         tests: [unique, not_null]
+
+  - name: stg_player_values
+    description: Player market values + photos from Transfermarkt.
+    columns:
+      - name: player_name
+        tests: [not_null]
+      - name: team_country
+        tests: [not_null]

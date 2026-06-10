@@ -111,6 +111,27 @@ def load_sample_team_info(con: duckdb.DuckDBPyConnection) -> int:
     return con.execute("SELECT count(*) FROM raw_team_info").fetchone()[0]
 
 
+def load_sample_player_values(con: duckdb.DuckDBPyConnection) -> int:
+    """Minimal ``raw_player_values`` fixture (Transfermarkt schema) for offline/CI."""
+    con.execute(
+        """
+        CREATE OR REPLACE TABLE raw_player_values (
+            team VARCHAR, player_name VARCHAR, market_value_str VARCHAR,
+            market_value_eur DOUBLE, photo_url VARCHAR, tm_player_id BIGINT
+        )
+        """
+    )
+    con.executemany(
+        "INSERT INTO raw_player_values VALUES (?, ?, ?, ?, ?, ?)",
+        [
+            ("Argentina", "Lionel Messi", "€15.00m", 15_000_000.0,
+             "https://img.a.transfermarkt.technology/portrait/medium/28003", 28003),
+            ("Tunisia", "Montassar Talbi", "€4.00m", 4_000_000.0, None, 401510),
+        ],
+    )
+    return con.execute("SELECT count(*) FROM raw_player_values").fetchone()[0]
+
+
 def load_all_samples(con: duckdb.DuckDBPyConnection) -> dict[str, int]:
     """Seed every raw table with offline samples (used by CI so dbt build runs)."""
     return {
@@ -118,4 +139,5 @@ def load_all_samples(con: duckdb.DuckDBPyConnection) -> dict[str, int]:
         "raw_squads": load_sample_squads(con),
         "raw_team_info": load_sample_team_info(con),
         "raw_player_stats": load_sample_player_stats(con),
+        "raw_player_values": load_sample_player_values(con),
     }

@@ -93,5 +93,35 @@ try:
 except Exception as e:  # noqa: BLE001
     print("skipped scorers chart:", e)
 
+# 7. Most valuable players
+try:
+    mv = con.execute(
+        "select player_name, team_country, round(market_value_eur/1e6,1) v "
+        "from dim_player where market_value_eur is not null order by market_value_eur desc limit 12"
+    ).df()
+    fig, ax = plt.subplots(figsize=(8, 6))
+    labels = mv["player_name"] + " (" + mv["team_country"] + ")"
+    ax.barh(labels[::-1], mv["v"][::-1], color="#00897b")
+    ax.set_title("Most valuable players — WC 2026 (Transfermarkt)")
+    ax.set_xlabel("Market value (€m)")
+    fig.savefig(OUT / "7_top_player_values.png", dpi=110)
+    plt.close(fig)
+except Exception as e:  # noqa: BLE001
+    print("skipped player-value chart:", e)
+
+# 8. Most valuable squads
+try:
+    tv = con.execute(
+        "select team_country, total_value_m from team_market_value order by total_value_m desc limit 15"
+    ).df()
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.barh(tv["team_country"][::-1], tv["total_value_m"][::-1], color="#3949ab")
+    ax.set_title("Most valuable squads — WC 2026 (Transfermarkt)")
+    ax.set_xlabel("Total squad value (€m)")
+    fig.savefig(OUT / "8_top_squad_values.png", dpi=110)
+    plt.close(fig)
+except Exception as e:  # noqa: BLE001
+    print("skipped squad-value chart:", e)
+
 con.close()
 print("charts written to", OUT)
