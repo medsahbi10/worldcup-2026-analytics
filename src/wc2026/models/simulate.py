@@ -69,14 +69,61 @@ def _precompute(model: dict, teams: list[str]) -> dict:
     return {"pre": pre, "gh": gh, "ga": ga}
 
 
-def _standard_bracket(seeds: list) -> list:
-    """Order seeds (best-first) into standard single-elim bracket positions."""
-    pos = [0]
-    size = 1
-    while size < len(seeds):
-        size *= 2
-        pos = [x for s in pos for x in (s, size - 1 - s)]
-    return [seeds[i] for i in pos]
+# Official 2026 Round-of-32 slot template (matches 73-88). A slot is either a
+# fixed group position ("1A"/"2B") or ("T", match_no) for a best-third slot.
+R32_TIES = [
+    (73, "2A", "2B"), (74, "1E", ("T", 74)), (75, "1F", "2C"), (76, "1C", "2F"),
+    (77, "1I", ("T", 77)), (78, "2E", "2I"), (79, "1A", ("T", 79)), (80, "1L", ("T", 80)),
+    (81, "1D", ("T", 81)), (82, "1G", ("T", 82)), (83, "2K", "2L"), (84, "1H", "2J"),
+    (85, "1B", ("T", 85)), (86, "1J", "2H"), (87, "1K", ("T", 87)), (88, "2D", "2G"),
+]
+# best-third slots -> the 5 groups whose third-placed team may fill them
+THIRD_ALLOWED = {
+    74: set("ABCDF"), 77: set("CDFGH"), 79: set("CEFHI"), 80: set("EHIJK"),
+    81: set("BEFIJ"), 82: set("AEHIJ"), 85: set("EFGIJ"), 87: set("DEIJL"),
+}
+# later rounds: (match_no, feeder_match_a, feeder_match_b)
+R16 = [(89, 74, 77), (90, 73, 75), (91, 76, 78), (92, 79, 80),
+       (93, 83, 84), (94, 81, 82), (95, 86, 88), (96, 85, 87)]
+QF = [(97, 89, 90), (98, 93, 94), (99, 91, 92), (100, 95, 96)]
+SF = [(101, 97, 98), (102, 99, 100)]
+FINAL = (104, 101, 102)
+
+
+def _assign_thirds(qual_groups: set) -> dict:
+    """Bijectively assign the 8 qualifying third-place groups to their slots.
+
+    Respects each slot's allowed-group set (FIFA's bracket constraint) via
+    backtracking. Returns {match_no: group_letter}. Falls back to a relaxed
+    assignment if (rarely) no perfect matching exists for the combination.
+    """
+    slots = sorted(THIRD_ALLOWED, key=lambda m: len(THIRD_ALLOWED[m] & qual_groups))
+    assign, used = {}, set()
+
+    def bt(i):
+        if i == len(slots):
+            return True
+        for g in THIRD_ALLOWED[slots[i]] & qual_groups:
+            if g not in used:
+                used.add(g)
+                assign[slots[i]] = g
+                if bt(i + 1):
+                    return True
+                used.remove(g)
+                del assign[slots[i]]
+        return False
+
+    if bt(0):
+        return assign
+    leftover = list(qual_groups)  # relaxed fallback (rare)
+    return {m: leftover[i] for i, m in enumerate(slots)}
+
+
+def _play(h, a, cum_lookup, gh_arr, ga_arr, rng):
+    cum, pen = cum_lookup[(h, a)]
+    k = np.searchsorted(cum, rng.random())
+    hg, ag = int(gh_arr[k]), int(ga_arr[k])
+    return h if (hg > ag or (hg == ag and rng.random() < pen)) else a
 
 
 def simulate_once(model: dict, groups: dict, pre: dict, rng: np.random.Generator) -> dict:
@@ -105,32 +152,37 @@ def simulate_once(model: dict, groups: dict, pre: dict, rng: np.random.Generator
                     pts[a] += 1
         order = sorted(teams, key=lambda t: (pts[t], gd[t], gf[t], rng.random()), reverse=True)
         group_rank[g] = order
-        thirds.append((order[2], pts[order[2]], gd[order[2]], gf[order[2]]))
+        third = order[2]
+        thirds.append((third, g, pts[third], gd[third], gf[third]))
 
-    winners = [group_rank[g][0] for g in groups]
-    runners = [group_rank[g][1] for g in groups]
-    best_thirds = [t[0] for t in sorted(thirds, key=lambda r: (r[1], r[2], r[3], rng.random()),
-                                        reverse=True)[:8]]
-    qualifiers = winners + runners + best_thirds
-
+    # qualifiers: top-2 per group + 8 best thirds. third record = (team, group, pts, gd, gf)
+    best_thirds = sorted(thirds, key=lambda r: (r[2], r[3], r[4], rng.random()), reverse=True)[:8]
+    qual_groups = {r[1] for r in best_thirds}
+    third_by_group = {r[1]: r[0] for r in best_thirds}
+    qualifiers = ([group_rank[g][0] for g in groups] + [group_rank[g][1] for g in groups]
+                  + [r[0] for r in best_thirds])
     reached = {t: "advance" for t in qualifiers}
-    # seed: winners, then runners, then thirds (each already roughly in strength order)
-    seeds = winners + runners + best_thirds
-    bracket = _standard_bracket(seeds)
 
-    round_idx = 1
-    while len(bracket) > 1:
-        nxt = []
-        for i in range(0, len(bracket), 2):
-            h, a = bracket[i], bracket[i + 1]
-            cum, pen = cum_lookup[(h, a)]
-            k = np.searchsorted(cum, rng.random())
-            hg, ag = int(gh_arr[k]), int(ga_arr[k])
-            winner = h if (hg > ag or (hg == ag and rng.random() < pen)) else a
-            nxt.append(winner)
-            reached[winner] = ROUND_NAMES[min(round_idx, len(ROUND_NAMES) - 1)]
-        bracket = nxt
-        round_idx += 1
+    # resolve the official R32 slots into actual teams
+    third_assign = _assign_thirds(qual_groups)
+
+    def team_of(slot):
+        if isinstance(slot, tuple):  # ("T", match_no) -> best third for that slot
+            return third_by_group[third_assign[slot[1]]]
+        return group_rank[slot[1]][int(slot[0]) - 1]  # "1A" -> group A, position 0
+
+    win = {}  # match_no -> winning team
+    for mno, sa, sb in R32_TIES:
+        w = _play(team_of(sa), team_of(sb), cum_lookup, gh_arr, ga_arr, rng)
+        win[mno] = w
+        reached[w] = "r16"
+    for stage, label in [(R16, "qf"), (QF, "sf"), (SF, "final")]:
+        for mno, m1, m2 in stage:
+            w = _play(win[m1], win[m2], cum_lookup, gh_arr, ga_arr, rng)
+            win[mno] = w
+            reached[w] = label
+    champ = _play(win[FINAL[1]], win[FINAL[2]], cum_lookup, gh_arr, ga_arr, rng)
+    reached[champ] = "champion"
     return reached
 
 
