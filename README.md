@@ -45,9 +45,12 @@ dagster asset materialize -m wc2026.definitions --select "*"
 # 2. Explore in the Dagster UI
 dagster dev -m wc2026.definitions
 
-# 3. Launch the live progress dashboard (Teams / Players / Historical + pipeline status)
+# 3. Launch the themed dashboard (Overview / Predictions / Groups / Schedule /
+#    Teams / Players / Lineup / Historical / Guide) — with flags & scoreboards
 streamlit run dashboard/app.py
 ```
+
+See **[GUIDE.md](GUIDE.md)** (or the in-app **📖 Guide** tab) for a full walkthrough.
 
 ## Project layout
 

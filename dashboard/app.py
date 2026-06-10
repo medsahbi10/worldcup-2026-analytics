@@ -11,9 +11,25 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from wc2026 import config
+from wc2026 import branding, config
 
-st.set_page_config(page_title="World Cup 2026 Analytics", layout="wide")
+st.set_page_config(page_title="World Cup 2026 Analytics", page_icon="⚽", layout="wide")
+st.markdown(branding.CSS, unsafe_allow_html=True)
+st.markdown(
+    branding.banner_html(
+        "FIFA WORLD CUP 2026 — ANALYTICS",
+        "Squads · groups · schedule · market values · predicted XIs · model forecasts",
+    ),
+    unsafe_allow_html=True,
+)
+
+
+def flagged(df, team_col="team_country", size="w40"):
+    """Attach a flag-URL column for st.column_config.ImageColumn."""
+    return branding.add_flag_column(df, team_col=team_col, size=size)
+
+
+FLAG_COL = st.column_config.ImageColumn("", width="small")
 
 
 @st.cache_resource
@@ -44,8 +60,6 @@ def row_count(name: str) -> int | None:
         return None
 
 
-st.title("⚽ World Cup 2026 — Analytics")
-
 with st.sidebar:
     st.header("Pipeline status")
     if st.button("🔄 Refresh data"):
@@ -67,9 +81,9 @@ with st.sidebar:
         st.write(f"{'✅' if n else '⏳'} **{label}** — {n if n is not None else 'not built'}")
 
 (tab_overview, tab_predict, tab_groups, tab_schedule, tab_teams, tab_players,
- tab_lineup, tab_history) = st.tabs(
+ tab_lineup, tab_history, tab_guide) = st.tabs(
     ["Overview", "Predictions", "Groups", "Schedule", "Teams", "Players", "Lineup",
-     "Historical"]
+     "Historical", "📖 Guide"]
 )
 
 # ---------------------------------------------------------------- Overview
@@ -128,12 +142,13 @@ with tab_predict:
         show = sim.head(20).copy()
         for c in ["p_advance", "p_qf", "p_sf", "p_final", "p_champion"]:
             show[c] = (show[c] * 100).round(1)
+        show = flagged(show)
         st.dataframe(
-            show[["team_country", "p_advance", "p_qf", "p_sf", "p_final", "p_champion"]],
+            show[["flag", "team_country", "p_advance", "p_qf", "p_sf", "p_final", "p_champion"]],
             hide_index=True, use_container_width=True,
             column_config={
-                "team_country": "Team", "p_advance": "Advance %", "p_qf": "QF %",
-                "p_sf": "SF %", "p_final": "Final %", "p_champion": "Champion %",
+                "flag": FLAG_COL, "team_country": "Team", "p_advance": "Advance %",
+                "p_qf": "QF %", "p_sf": "SF %", "p_final": "Final %", "p_champion": "Champion %",
             },
         )
     else:
@@ -153,11 +168,17 @@ with tab_predict:
         away = c2.selectbox("Team B", opts, index=opts.index("France") if "France" in opts else 1)
         if home != away:
             ph, pdr, pa, lam, mu = _match_probs(strengths, params, home, away)
+            st.markdown(
+                branding.score_card_html(
+                    home, away, branding.flag_url(home), branding.flag_url(away),
+                    f"{lam:.1f} – {mu:.1f}", "xG",
+                ),
+                unsafe_allow_html=True,
+            )
             m1, m2, m3 = st.columns(3)
             m1.metric(f"{home} win", f"{ph * 100:.0f}%")
             m2.metric("Draw", f"{pdr * 100:.0f}%")
             m3.metric(f"{away} win", f"{pa * 100:.0f}%")
-            st.caption(f"Expected goals — {home} {lam:.2f} · {away} {mu:.2f}")
 
         st.divider()
         st.subheader("📊 Strength ratings cross-check")
@@ -170,10 +191,11 @@ with tab_predict:
             "left join team_market_value v using (team_country) "
             "order by s.overall desc"
         )
+        ratings = flagged(ratings)
         st.dataframe(
             ratings, hide_index=True, use_container_width=True,
             column_config={
-                "team_country": "Team", "dc_overall": "DC strength",
+                "flag": FLAG_COL, "team_country": "Team", "dc_overall": "DC strength",
                 "elo": "Elo", "value_m": "Squad value (€m)",
             },
         )
@@ -191,12 +213,21 @@ with tab_groups:
             cols = st.columns(3)
             for col, letter in zip(cols, letters[i:i + 3]):
                 with col:
-                    st.markdown(f"**Group {letter}**")
-                    grp = gs[gs["group_letter"] == letter][
-                        ["team_country", "played", "won", "drawn", "lost", "goal_diff", "points"]
-                    ].rename(columns={"team_country": "Team", "played": "P", "won": "W",
-                                      "drawn": "D", "lost": "L", "goal_diff": "GD", "points": "Pts"})
-                    st.dataframe(grp, hide_index=True, use_container_width=True)
+                    st.markdown(f"#### Group {letter}")
+                    grp = gs[gs["group_letter"] == letter].sort_values(
+                        ["points", "goal_diff"], ascending=False)
+                    grp = flagged(grp)[
+                        ["flag", "team_country", "played", "won", "drawn", "lost",
+                         "goal_diff", "points"]
+                    ]
+                    st.dataframe(
+                        grp, hide_index=True, use_container_width=True,
+                        column_config={
+                            "flag": FLAG_COL, "team_country": "Team", "played": "P",
+                            "won": "W", "drawn": "D", "lost": "L", "goal_diff": "GD",
+                            "points": "Pts",
+                        },
+                    )
     else:
         st.info("Group standings not built yet.")
 
@@ -214,21 +245,23 @@ with tab_schedule:
             view = view[view["group_letter"] == gpick]
         if tpick != "All":
             view = view[(view["home_team"] == tpick) | (view["away_team"] == tpick)]
-        st.caption(f"{len(view)} matches")
-        st.dataframe(
-            view[["match_date", "kickoff_local", "group_letter", "home_team", "away_team",
-                  "home_score", "away_score", "venue", "status"]],
-            hide_index=True, use_container_width=True,
-            column_config={
-                "match_date": st.column_config.DateColumn("Date"),
-                "kickoff_local": st.column_config.TextColumn("Kickoff"),
-                "group_letter": st.column_config.TextColumn("Grp"),
-                "home_team": st.column_config.TextColumn("Home"),
-                "away_team": st.column_config.TextColumn("Away"),
-                "home_score": st.column_config.NumberColumn("H", format="%d"),
-                "away_score": st.column_config.NumberColumn("A", format="%d"),
-            },
-        )
+        view = view.sort_values(["match_date", "kickoff_local"])
+        st.caption(f"{len(view)} matches — broadcast-style scoreboard")
+        cards, current_date = [], None
+        for r in view.itertuples():
+            d = str(r.match_date)[:10]
+            if d != current_date:
+                cards.append(f'<h4 style="margin:14px 0 2px">{d}</h4>')
+                current_date = d
+            if r.status == "played" and pd.notna(r.home_score):
+                score = f"{int(r.home_score)} – {int(r.away_score)}"
+            else:
+                score = r.kickoff_local or "vs"
+            meta = f"Grp {r.group_letter or '–'}<br>{(r.venue or '').split(' (')[0]}"
+            cards.append(branding.score_card_html(
+                r.home_team, r.away_team,
+                branding.flag_url(r.home_team), branding.flag_url(r.away_team), score, meta))
+        st.markdown("\n".join(cards), unsafe_allow_html=True)
     else:
         st.info("Schedule not built yet.")
 
@@ -240,10 +273,12 @@ with tab_teams:
         pick = st.selectbox("Confederation", confs)
         view = ts if pick == "All" else ts[ts["confederation"] == pick]
         st.subheader(f"Squad profiles ({len(view)} teams)")
+        tv = flagged(view)
         st.dataframe(
-            view[["team_country", "confederation", "manager", "squad_size", "avg_age",
-                  "distinct_clubs", "goalkeepers", "defenders", "midfielders", "forwards"]],
+            tv[["flag", "team_country", "confederation", "manager", "squad_size", "avg_age",
+                "distinct_clubs", "goalkeepers", "defenders", "midfielders", "forwards"]],
             use_container_width=True, hide_index=True,
+            column_config={"flag": FLAG_COL, "team_country": "Team"},
         )
         st.subheader("Average squad age")
         st.bar_chart(view.set_index("team_country")["avg_age"])
@@ -274,7 +309,8 @@ with tab_players:
             view = view.sort_values("market_value_eur", ascending=False, na_position="last")
             view = view.assign(value_m=(view["market_value_eur"] / 1e6).round(1))
         st.caption(f"{len(view)} players")
-        cols = ["photo_url", "player_name", "team_country", "position", "age", "club"]
+        view = flagged(view)
+        cols = ["photo_url", "player_name", "flag", "team_country", "position", "age", "club"]
         cols += ["value_m"] if has_value else []
         cols = [c for c in cols if c in view.columns]
         st.dataframe(
@@ -282,6 +318,7 @@ with tab_players:
             use_container_width=True, hide_index=True,
             column_config={
                 "photo_url": st.column_config.ImageColumn("Photo"),
+                "flag": FLAG_COL, "team_country": "Team",
                 "value_m": st.column_config.NumberColumn("Value (€m)", format="%.1f"),
             },
         )
@@ -306,7 +343,12 @@ with tab_lineup:
             "order by pos_rank, shirt_number"
         )
         formation_str = xi["formation"].iloc[0] if len(xi) else "?"
-        st.markdown(f"### {team} &nbsp;·&nbsp; `{formation_str}`")
+        st.markdown(
+            f'<h3><img src="{branding.flag_url(team, "w40")}" style="height:24px;'
+            f'vertical-align:middle;border-radius:2px"> {team} &nbsp;·&nbsp; '
+            f'<code>{formation_str}</code></h3>',
+            unsafe_allow_html=True,
+        )
         st.caption("Predicted XI from the team's most recent friendly (replaced by real lineups once matches start).")
 
         view = xi.assign(value_m=(xi["market_value_eur"] / 1e6).round(1))
@@ -337,3 +379,39 @@ with tab_history:
         )
     else:
         st.info("Historical player stats not built yet.")
+
+# ---------------------------------------------------------------- Guide
+with tab_guide:
+    st.markdown(
+        """
+### 📖 User guide
+
+Welcome! This app explores the **FIFA World Cup 2026** on two levels — **players** and
+**teams** — from live tournament data through to a predictive model. Here's what each tab does.
+
+| Tab | What you'll find |
+|---|---|
+| **Overview** | Headline numbers: players, teams, average age, total squad value, and qualified teams by confederation. |
+| **Predictions** | 🏆 **Title odds** from 20,000 Monte-Carlo simulations, an interactive **head-to-head predictor** (pick any two teams), and a **strength cross-check** (model vs Elo vs market value). |
+| **Groups** | All 12 group tables (A–L). Standings are **zero pre-tournament** and **update live** as matches are played. |
+| **Schedule** | All 72 group fixtures as broadcast-style **scoreboard cards** — date, kickoff, group, venue. Filter by group or team. |
+| **Teams** | Squad profiles: size, average age, club spread, positional split, **confederation & manager**. Plus most-valuable squads. |
+| **Players** | Every one of the ~1,255 players with **photo, position, club, age and market value**. Filter by team & position. |
+| **Lineup** | Each team's **predicted starting XI** (from their last friendly) as a teamsheet, with the real formation. |
+| **Historical** | World Cup 2022 reference stats (top scorers) — the data the model trains on. |
+
+#### How the predictions work
+1. A **Dixon-Coles** goal model is trained on **49,000 international results** (1872–today), weighting recent matches more.
+2. Team strengths are nudged toward **squad market value** (an independent talent signal) via shrinkage.
+3. The tournament is **simulated 20,000 times** — group stage → real 2026 knockout bracket → champion — to get each team's odds.
+4. Backtested on WC2018 & WC2022: **~56% match accuracy**, and the probabilities are **well-calibrated**.
+
+#### Notes & honest caveats
+- **Pre-tournament:** standings/live stats are empty until 11 June 2026; everything fills in automatically as matches play.
+- **Predicted XIs** come from each team's last friendly and will be replaced by **real lineups** once games start.
+- **Flags** for all 48 teams are shown; national-team **crests are trademarked**, so flags are used throughout.
+- Market value + photos cover **98.5%** of players (a few hard-to-match names are blank).
+
+*Use the **🔄 Refresh data** button in the sidebar to re-read the warehouse as the pipeline updates.*
+"""
+    )
