@@ -249,6 +249,12 @@ def build_and_persist_model(con: duckdb.DuckDBPyConnection, half_life_years: flo
     final = fit(matches, half_life_years=half_life_years,
                 prior_attack=prior_a, prior_defense=prior_d, lam_prior=lam_prior)
 
+    # optional Elo cross-check rating (keyed by dataset names)
+    try:
+        elo = dict(con.execute("select team, elo from team_elo").fetchall())
+    except Exception:  # noqa: BLE001 — team_elo may not be built yet
+        elo = {}
+
     wc = [r[0] for r in con.execute("select team_country from dim_national_team").fetchall()]
     rows = []
     for t in wc:
@@ -256,9 +262,11 @@ def build_and_persist_model(con: duckdb.DuckDBPyConnection, half_life_years: flo
         if ds in final["attack"]:
             rows.append({"team_country": t, "attack": final["attack"][ds],
                          "defense": final["defense"][ds],
-                         "overall": final["attack"][ds] + final["defense"][ds]})
+                         "overall": final["attack"][ds] + final["defense"][ds],
+                         "elo": elo.get(ds)})
     df = pd.DataFrame(rows)  # noqa: F841 — used by DuckDB below
-    con.execute("CREATE OR REPLACE TABLE model_team_strength AS SELECT * FROM df")
+    con.execute("CREATE OR REPLACE TABLE model_team_strength AS "
+                "SELECT team_country, attack, defense, overall, elo FROM df")
     con.execute(
         "CREATE OR REPLACE TABLE model_params AS "
         f"SELECT {final['home_adv']} as home_adv, {final['rho']} as rho, "

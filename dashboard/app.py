@@ -158,6 +158,25 @@ with tab_predict:
             m2.metric("Draw", f"{pdr * 100:.0f}%")
             m3.metric(f"{away} win", f"{pa * 100:.0f}%")
             st.caption(f"Expected goals — {home} {lam:.2f} · {away} {mu:.2f}")
+
+        st.divider()
+        st.subheader("📊 Strength ratings cross-check")
+        st.caption("Three signals. Dixon-Coles & Elo agree ~0.93 (both results-based); "
+                   "market value is the independent talent signal.")
+        ratings = q(
+            "select s.team_country, round(s.overall, 2) as dc_overall, "
+            "round(s.elo) as elo, round(v.total_value_m) as value_m "
+            "from model_team_strength s "
+            "left join team_market_value v using (team_country) "
+            "order by s.overall desc"
+        )
+        st.dataframe(
+            ratings, hide_index=True, use_container_width=True,
+            column_config={
+                "team_country": "Team", "dc_overall": "DC strength",
+                "elo": "Elo", "value_m": "Squad value (€m)",
+            },
+        )
     else:
         st.info("Model strengths not built yet.")
 

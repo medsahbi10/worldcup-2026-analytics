@@ -24,7 +24,7 @@ from wc2026 import config, seed
 from wc2026.ingestion import (
     competition, fbref, lineups, match_values, results, transfermarkt,
 )
-from wc2026.models import dixon_coles, simulate
+from wc2026.models import dixon_coles, elo, simulate
 
 DBT_DIR = config.PROJECT_ROOT / "dbt"
 
@@ -186,7 +186,18 @@ def raw_intl_results(context: AssetExecutionContext) -> None:
     context.log.info(f"Loaded {n} rows into raw_intl_results")
 
 
-@asset(deps=[raw_intl_results, dbt_marts])
+@asset(deps=[raw_intl_results])
+def team_elo(context: AssetExecutionContext) -> None:
+    """Compute World-Football-style Elo from results (cross-check rating)."""
+    con = config.connect()
+    try:
+        n = elo.persist(con)
+    finally:
+        con.close()
+    context.log.info(f"Computed Elo for {n} teams")
+
+
+@asset(deps=[raw_intl_results, team_elo, dbt_marts])
 def model_strength(context: AssetExecutionContext) -> None:
     """Fit the Dixon-Coles + value-prior model; persist team strengths + params."""
     con = config.connect()
@@ -223,6 +234,7 @@ defs = Definitions(
         player_value_map,
         dbt_marts,
         raw_intl_results,
+        team_elo,
         model_strength,
         sim_results,
     ]
