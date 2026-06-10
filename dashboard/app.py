@@ -4,7 +4,10 @@ Run:  streamlit run dashboard/app.py
 Use the "Refresh data" button to re-read the warehouse as the pipeline runs.
 """
 
+import math
+
 import duckdb
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -54,7 +57,8 @@ with st.sidebar:
         "dim_national_team": "Teams (dim)",
         "group_standings": "Group standings",
         "fct_fixture": "Fixtures",
-        "predicted_xi": "Predicted XIs",
+        "model_team_strength": "Model strengths",
+        "sim_results": "Title odds",
         "fct_player_stats": "Hist. stats (mart)",
         "fct_match": "Matches",
     }
@@ -62,9 +66,10 @@ with st.sidebar:
         n = row_count(tbl)
         st.write(f"{'✅' if n else '⏳'} **{label}** — {n if n is not None else 'not built'}")
 
-(tab_overview, tab_groups, tab_schedule, tab_teams, tab_players, tab_lineup,
- tab_history) = st.tabs(
-    ["Overview", "Groups", "Schedule", "Teams", "Players", "Lineup", "Historical"]
+(tab_overview, tab_predict, tab_groups, tab_schedule, tab_teams, tab_players,
+ tab_lineup, tab_history) = st.tabs(
+    ["Overview", "Predictions", "Groups", "Schedule", "Teams", "Players", "Lineup",
+     "Historical"]
 )
 
 # ---------------------------------------------------------------- Overview
@@ -94,6 +99,67 @@ with tab_overview:
     else:
         st.info("Run the pipeline to populate players: "
                 "`dagster asset materialize -m wc2026.definitions --select raw_squads,dbt_marts`")
+
+# ---------------------------------------------------------------- Predictions
+def _match_probs(strengths, params, home, away, max_goals=8):
+    """Dixon-Coles W/D/L + expected goals for a neutral-venue matchup."""
+    att, dfn, rho = strengths["attack"], strengths["defense"], params["rho"]
+    lam = math.exp(att[home] - dfn[away])
+    mu = math.exp(att[away] - dfn[home])
+    i = np.arange(max_goals + 1)
+    fac = np.array([math.factorial(k) for k in i])
+    mat = np.outer(np.exp(-lam) * lam ** i / fac, np.exp(-mu) * mu ** i / fac)
+    mat[0, 0] *= 1 - lam * mu * rho
+    mat[0, 1] *= 1 + lam * rho
+    mat[1, 0] *= 1 + mu * rho
+    mat[1, 1] *= 1 - rho
+    mat /= mat.sum()
+    return (float(np.tril(mat, -1).sum()), float(np.trace(mat)),
+            float(np.triu(mat, 1).sum()), lam, mu)
+
+
+with tab_predict:
+    if table_exists("sim_results"):
+        st.subheader("🏆 Title odds — 20,000 Monte-Carlo simulations")
+        st.caption("Dixon-Coles goal model (value-shrunk strengths) → simulate groups → knockouts.")
+        sim = q("select * from sim_results order by p_champion desc")
+        top = sim.head(16).assign(Champion=(sim["p_champion"] * 100).round(1))
+        st.bar_chart(top.set_index("team_country")["Champion"])
+        show = sim.head(20).copy()
+        for c in ["p_advance", "p_qf", "p_sf", "p_final", "p_champion"]:
+            show[c] = (show[c] * 100).round(1)
+        st.dataframe(
+            show[["team_country", "p_advance", "p_qf", "p_sf", "p_final", "p_champion"]],
+            hide_index=True, use_container_width=True,
+            column_config={
+                "team_country": "Team", "p_advance": "Advance %", "p_qf": "QF %",
+                "p_sf": "SF %", "p_final": "Final %", "p_champion": "Champion %",
+            },
+        )
+    else:
+        st.info("Run the model + simulation assets to populate predictions.")
+
+    if table_exists("model_team_strength"):
+        st.divider()
+        st.subheader("⚔️ Head-to-head predictor (neutral venue)")
+        strengths = {
+            "attack": dict(q("select team_country, attack from model_team_strength").values),
+            "defense": dict(q("select team_country, defense from model_team_strength").values),
+        }
+        params = q("select home_adv, rho from model_params").iloc[0].to_dict()
+        opts = sorted(strengths["attack"])
+        c1, c2 = st.columns(2)
+        home = c1.selectbox("Team A", opts, index=opts.index("Argentina") if "Argentina" in opts else 0)
+        away = c2.selectbox("Team B", opts, index=opts.index("France") if "France" in opts else 1)
+        if home != away:
+            ph, pdr, pa, lam, mu = _match_probs(strengths, params, home, away)
+            m1, m2, m3 = st.columns(3)
+            m1.metric(f"{home} win", f"{ph * 100:.0f}%")
+            m2.metric("Draw", f"{pdr * 100:.0f}%")
+            m3.metric(f"{away} win", f"{pa * 100:.0f}%")
+            st.caption(f"Expected goals — {home} {lam:.2f} · {away} {mu:.2f}")
+    else:
+        st.info("Model strengths not built yet.")
 
 # ---------------------------------------------------------------- Groups
 with tab_groups:

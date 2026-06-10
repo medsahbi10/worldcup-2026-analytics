@@ -21,7 +21,10 @@ from pathlib import Path
 from dagster import AssetExecutionContext, Definitions, asset
 
 from wc2026 import config, seed
-from wc2026.ingestion import competition, fbref, lineups, match_values, transfermarkt
+from wc2026.ingestion import (
+    competition, fbref, lineups, match_values, results, transfermarkt,
+)
+from wc2026.models import dixon_coles, simulate
 
 DBT_DIR = config.PROJECT_ROOT / "dbt"
 
@@ -172,6 +175,41 @@ def dbt_marts(context: AssetExecutionContext) -> None:
         raise RuntimeError("dbt build failed")
 
 
+@asset
+def raw_intl_results(context: AssetExecutionContext) -> None:
+    """Ingest historical international match results (model training data)."""
+    con = config.connect()
+    try:
+        n = results.load_results(con)
+    finally:
+        con.close()
+    context.log.info(f"Loaded {n} rows into raw_intl_results")
+
+
+@asset(deps=[raw_intl_results, dbt_marts])
+def model_strength(context: AssetExecutionContext) -> None:
+    """Fit the Dixon-Coles + value-prior model; persist team strengths + params."""
+    con = config.connect()
+    try:
+        n = dixon_coles.build_and_persist_model(con)
+    finally:
+        con.close()
+    context.log.info(f"Persisted strengths for {n} WC teams")
+
+
+@asset(deps=[model_strength, dbt_marts])
+def sim_results(context: AssetExecutionContext) -> None:
+    """Monte-Carlo simulate the tournament; persist per-team advancement odds."""
+    con = config.connect()
+    try:
+        df = simulate.run(con, n_sims=20000)
+    finally:
+        con.close()
+    champ = df.iloc[0]
+    context.log.info(f"Simulated 20k tournaments; favourite {champ['team_country']} "
+                     f"({champ['p_champion'] * 100:.1f}%)")
+
+
 defs = Definitions(
     assets=[
         raw_matches,
@@ -184,5 +222,8 @@ defs = Definitions(
         raw_fixtures,
         player_value_map,
         dbt_marts,
+        raw_intl_results,
+        model_strength,
+        sim_results,
     ]
 )
