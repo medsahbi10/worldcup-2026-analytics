@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: stg_matches
+    description: Cleaned, typed match records from the raw landing table.
+    columns:
+      - name: match_id
+        tests: [unique, not_null]
+      - name: home_team
+        tests: [not_null]
+      - name: away_team
+        tests: [not_null]
+
+  - name: stg_squads
+    description: Cleaned 2026 World Cup squad rows (one per player) from FBref.
+    columns:
+      - name: player_name
+        tests: [not_null]
+      - name: team_country
+        tests: [not_null]
+
+  - name: stg_player_stats
+    description: Cleaned historical World Cup player stats from FBref.
+    columns:
+      - name: player_name
+        tests: [not_null]
+
+  - name: stg_team_info
+    description: Team metadata (confederation + manager) from FBref.
+    columns:
+      - name: team_country
+        tests: [unique, not_null]

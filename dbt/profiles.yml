@@ -1,0 +1,12 @@
+# Target chosen by WC_ENV: unset -> dev (local file), "cloud" -> MotherDuck.
+wc2026:
+  target: "{{ env_var('WC_ENV', 'dev') }}"
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('WC_DUCKDB_PATH', 'data/wc2026.duckdb') }}"
+      threads: 4
+    cloud:
+      type: duckdb
+      path: "md:{{ env_var('MOTHERDUCK_DATABASE', 'wc2026') }}"
+      threads: 4

@@ -1,0 +1,44 @@
+version: 2
+
+models:
+  - name: dim_player
+    description: One row per 2026 World Cup squad member (FBref).
+    columns:
+      - name: player_id
+        tests: [unique, not_null]
+      - name: player_name
+        tests: [not_null]
+      - name: team_country
+        tests: [not_null]
+
+  - name: team_squad_summary
+    description: Per-team squad profile (size, age, club spread, positional split, confederation, manager).
+    columns:
+      - name: team_country
+        tests: [unique, not_null]
+
+  - name: dim_national_team
+    description: National-team dimension — confederation, manager, squad profile.
+    columns:
+      - name: team_id
+        tests: [unique, not_null]
+      - name: team_country
+        tests: [unique, not_null]
+
+  - name: fct_player_stats
+    description: Historical per-player World Cup performance (FBref).
+    columns:
+      - name: player_name
+        tests: [not_null]
+
+  - name: dim_team
+    description: National teams appearing in match data.
+    columns:
+      - name: team_id
+        tests: [unique, not_null]
+
+  - name: fct_match
+    description: Team-level match facts with derived winner.
+    columns:
+      - name: match_id
+        tests: [unique, not_null]

@@ -1,0 +1,39 @@
+[project]
+name = "wc2026-analytics"
+version = "0.1.0"
+description = "World Cup 2026 analytics: player- and team-level pipeline, models, and dashboard"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb>=1.0",
+    "dbt-duckdb>=1.8",
+    "dagster>=1.7",
+    "dagster-webserver>=1.7",
+    "soccerdata>=1.8",
+    "requests>=2.31",
+    "pandas>=2.2",
+    "python-dotenv>=1.0",
+    "streamlit>=1.36",
+    "scikit-learn>=1.5",
+    "xgboost>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

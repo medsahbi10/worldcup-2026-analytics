@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test
+        run: pytest -q
+
+      - name: Pipeline smoke test (local DuckDB)
+        run: |
+          python -c "from wc2026 import config, seed; con = config.connect(); print(seed.load_all_samples(con)); con.close()"
+          dbt build --project-dir dbt --profiles-dir dbt

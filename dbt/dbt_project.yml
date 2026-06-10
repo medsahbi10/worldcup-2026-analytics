@@ -1,0 +1,16 @@
+name: wc2026
+version: "0.1.0"
+config-version: 2
+
+profile: wc2026
+
+model-paths: ["models"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  wc2026:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
