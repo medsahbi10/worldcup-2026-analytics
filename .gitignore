@@ -26,6 +26,12 @@ dbt/logs/
 .dagster_home/
 tmp*/
 
+# seleniumbase / scraper scratch artifacts
+downloaded_files/
+latest_logs/
+assets/
+geckodriver.log
+
 # Environment
 .env
 
