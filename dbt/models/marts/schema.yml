@@ -37,6 +37,28 @@ models:
       - name: team_country
         tests: [unique, not_null]
 
+  - name: predicted_xi
+    description: Predicted starting XI per team (from last friendly) with value + photo.
+    columns:
+      - name: player_name
+        tests: [not_null]
+      - name: team_country
+        tests: [not_null]
+
+  - name: group_standings
+    description: Group standings (12 groups), live-updating.
+    columns:
+      - name: team_country
+        tests: [unique, not_null]
+
+  - name: fct_fixture
+    description: Match fixtures with stage, group, date, kickoff, venue, score, status.
+    columns:
+      - name: home_team
+        tests: [not_null]
+      - name: away_team
+        tests: [not_null]
+
   - name: dim_team
     description: National teams appearing in match data.
     columns:

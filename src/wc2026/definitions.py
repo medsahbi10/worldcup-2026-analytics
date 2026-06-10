@@ -21,7 +21,7 @@ from pathlib import Path
 from dagster import AssetExecutionContext, Definitions, asset
 
 from wc2026 import config, seed
-from wc2026.ingestion import fbref, transfermarkt
+from wc2026.ingestion import competition, fbref, lineups, match_values, transfermarkt
 
 DBT_DIR = config.PROJECT_ROOT / "dbt"
 
@@ -87,7 +87,67 @@ def raw_player_values(context: AssetExecutionContext) -> None:
     context.log.info(f"Loaded {n} market-value rows into raw_player_values")
 
 
-@asset(deps=[raw_matches, raw_squads, raw_team_info, raw_player_stats, raw_player_values])
+@asset(deps=[raw_squads])
+def raw_lineups(context: AssetExecutionContext) -> None:
+    """Predicted XIs + formations from each team's last friendly (FBref match pages)."""
+    con = config.connect()
+    try:
+        n = lineups.load_lineups(con, season="2026")
+    finally:
+        con.close()
+    context.log.info(f"Loaded lineups for {n} teams into raw_lineups")
+
+
+@asset
+def raw_group_standings(context: AssetExecutionContext) -> None:
+    """Ingest group membership + standings from the FBref competition page."""
+    con = config.connect()
+    try:
+        n = competition.load_groups(con, season="2026")
+    finally:
+        con.close()
+    context.log.info(f"Loaded {n} rows into raw_group_standings")
+
+
+@asset
+def raw_fixtures(context: AssetExecutionContext) -> None:
+    """Ingest the match schedule (venue, date, kickoff time) from FBref."""
+    con = config.connect()
+    try:
+        n = competition.load_fixtures(con, season="2026")
+    finally:
+        con.close()
+    context.log.info(f"Loaded {n} rows into raw_fixtures")
+
+
+@asset(deps=[raw_squads, raw_player_values])
+def player_value_map(context: AssetExecutionContext) -> None:
+    """Fuzzy-match FBref squads to Transfermarkt values/photos (per-team name matching)."""
+    con = config.connect()
+    try:
+        res = match_values.build_value_map(con)
+        filled = match_values.fill_missing_via_search(con)
+    finally:
+        con.close()
+    context.log.info(
+        f"Matched {res['matched']}/{res['total']} ({res['rate']}%); "
+        f"search pass filled {filled} more"
+    )
+
+
+@asset(
+    deps=[
+        raw_matches,
+        raw_squads,
+        raw_team_info,
+        raw_player_stats,
+        raw_player_values,
+        raw_lineups,
+        raw_group_standings,
+        raw_fixtures,
+        player_value_map,
+    ]
+)
 def dbt_marts(context: AssetExecutionContext) -> None:
     """Build dbt staging + marts models on top of the raw tables."""
     # Pass an absolute DB path so dbt doesn't resolve a relative path against
@@ -119,6 +179,10 @@ defs = Definitions(
         raw_team_info,
         raw_player_stats,
         raw_player_values,
+        raw_lineups,
+        raw_group_standings,
+        raw_fixtures,
+        player_value_map,
         dbt_marts,
     ]
 )

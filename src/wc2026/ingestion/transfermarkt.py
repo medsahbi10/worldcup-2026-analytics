@@ -13,11 +13,14 @@ from __future__ import annotations
 
 import re
 import unicodedata
+import urllib.parse
 import urllib.request
 
 import duckdb
 import pandas as pd
 from bs4 import BeautifulSoup
+
+_PROFILE_RE = re.compile(r"/([a-z0-9-]+)/profil/spieler/(\d+)")
 
 _UA = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -100,6 +103,29 @@ def parse_squad_values(html: str, team: str) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(recs)
+
+
+def search_player(name: str) -> dict | None:
+    """Look up a single player via TM search; return profile name + value + photo."""
+    sr = _get("https://www.transfermarkt.com/schnellsuche/ergebnis/schnellsuche?query="
+              + urllib.parse.quote(name))
+    m = _PROFILE_RE.search(sr)
+    if not m:
+        return None
+    slug, pid = m.group(1), m.group(2)
+    page = _get(f"https://www.transfermarkt.com/{slug}/profil/spieler/{pid}")
+    h1 = re.search(r"<h1[^>]*>(.*?)</h1>", page, re.S)
+    profile_name = re.sub(r"#?\d+", "", re.sub(r"<[^>]+>", " ", h1.group(1))).strip() if h1 else ""
+    val = re.search(r"€[\d.,]+\s*[mk]?", page)
+    photo = re.search(
+        r"https://img\.a\.transfermarkt\.technology/portrait/[a-z]+/" + pid + r"[^\"' ]*", page
+    )
+    return {
+        "tm_id": int(pid),
+        "profile_name": profile_name,
+        "market_value_eur": _parse_value(val.group(0) if val else None),
+        "photo_url": photo.group(0) if photo else None,
+    }
 
 
 def load_player_values(

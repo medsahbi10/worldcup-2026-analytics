@@ -132,6 +132,91 @@ def load_sample_player_values(con: duckdb.DuckDBPyConnection) -> int:
     return con.execute("SELECT count(*) FROM raw_player_values").fetchone()[0]
 
 
+def load_sample_lineups(con: duckdb.DuckDBPyConnection) -> int:
+    """Minimal ``raw_lineups`` fixture for offline/CI (4-1-4-1 partial)."""
+    con.execute(
+        """
+        CREATE OR REPLACE TABLE raw_lineups (
+            team VARCHAR, formation VARCHAR, match_url VARCHAR,
+            shirt_number VARCHAR, player_name VARCHAR, position VARCHAR, pos_rank BIGINT
+        )
+        """
+    )
+    con.executemany(
+        "INSERT INTO raw_lineups VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [
+            ("Tunisia", "4-1-4-1", "http://x", "1", "Mouhib Chamakh", "GK", 0),
+            ("Tunisia", "4-1-4-1", "http://x", "3", "Montassar Talbi", "CB", 1),
+        ],
+    )
+    return con.execute("SELECT count(*) FROM raw_lineups").fetchone()[0]
+
+
+def load_sample_value_map(con: duckdb.DuckDBPyConnection) -> int:
+    """Minimal ``player_value_map`` fixture (matched to sample squads) for offline/CI."""
+    con.execute(
+        """
+        CREATE OR REPLACE TABLE player_value_map (
+            team_country VARCHAR, player_name VARCHAR, market_value_eur DOUBLE,
+            photo_url VARCHAR, matched_name VARCHAR, match_score DOUBLE
+        )
+        """
+    )
+    con.executemany(
+        "INSERT INTO player_value_map VALUES (?, ?, ?, ?, ?, ?)",
+        [
+            ("Argentina", "Lionel Messi", 15_000_000.0,
+             "https://img.a.transfermarkt.technology/portrait/medium/28003", "Lionel Messi", 100.0),
+            ("Tunisia", "Montassar Talbi", 4_000_000.0, None, "Montassar Talbi", 100.0),
+            ("Tunisia", "Aymen Dahmen", None, None, None, None),
+        ],
+    )
+    return con.execute("SELECT count(*) FROM player_value_map").fetchone()[0]
+
+
+def load_sample_group_standings(con: duckdb.DuckDBPyConnection) -> int:
+    """Minimal ``raw_group_standings`` fixture for offline/CI."""
+    con.execute(
+        """
+        CREATE OR REPLACE TABLE raw_group_standings (
+            group_letter VARCHAR, team VARCHAR, rank VARCHAR, mp VARCHAR,
+            w VARCHAR, d VARCHAR, l VARCHAR, gf VARCHAR, ga VARCHAR, gd VARCHAR, pts VARCHAR
+        )
+        """
+    )
+    con.executemany(
+        "INSERT INTO raw_group_standings VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        [
+            ("A", "Mexico", "1", "0", "0", "0", "0", None, None, None, "0"),
+            ("A", "Czechia", "2", "0", "0", "0", "0", None, None, None, "0"),
+        ],
+    )
+    return con.execute("SELECT count(*) FROM raw_group_standings").fetchone()[0]
+
+
+def load_sample_fixtures(con: duckdb.DuckDBPyConnection) -> int:
+    """Minimal ``raw_fixtures`` fixture for offline/CI."""
+    con.execute(
+        """
+        CREATE OR REPLACE TABLE raw_fixtures (
+            round VARCHAR, day VARCHAR, date VARCHAR, time VARCHAR,
+            home_team VARCHAR, score VARCHAR, away_team VARCHAR,
+            venue VARCHAR, attendance VARCHAR, referee VARCHAR, game_id VARCHAR
+        )
+        """
+    )
+    con.executemany(
+        "INSERT INTO raw_fixtures VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        [
+            ("Group stage", "Thu", "2026-06-11", "20:00 (03:00)", "Korea Republic",
+             None, "Czechia", "Estadio Akron", None, None, "abc123"),
+            ("Group stage", "Thu", "2026-06-11", "13:00 (20:00)", "Mexico",
+             None, "South Africa", "Estadio Banorte", None, None, "def456"),
+        ],
+    )
+    return con.execute("SELECT count(*) FROM raw_fixtures").fetchone()[0]
+
+
 def load_all_samples(con: duckdb.DuckDBPyConnection) -> dict[str, int]:
     """Seed every raw table with offline samples (used by CI so dbt build runs)."""
     return {
@@ -140,4 +225,8 @@ def load_all_samples(con: duckdb.DuckDBPyConnection) -> dict[str, int]:
         "raw_team_info": load_sample_team_info(con),
         "raw_player_stats": load_sample_player_stats(con),
         "raw_player_values": load_sample_player_values(con),
+        "raw_lineups": load_sample_lineups(con),
+        "player_value_map": load_sample_value_map(con),
+        "raw_group_standings": load_sample_group_standings(con),
+        "raw_fixtures": load_sample_fixtures(con),
     }

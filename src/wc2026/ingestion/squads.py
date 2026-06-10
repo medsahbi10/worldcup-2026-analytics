@@ -9,7 +9,6 @@ the right country attached.
 from __future__ import annotations
 
 import io
-import re
 import urllib.request
 
 import duckdb

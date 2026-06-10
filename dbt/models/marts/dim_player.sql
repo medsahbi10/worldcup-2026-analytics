@@ -1,14 +1,13 @@
 -- Player dimension: one row per 2026 World Cup squad member (FBref),
--- enriched with Transfermarkt market value + photo (matched within team by name).
+-- enriched with Transfermarkt market value + photo via fuzzy name matching
+-- (player_value_map, built in Python — handles spelling/order/mononym diffs).
 with squad as (
-    select
-        *,
-        regexp_replace(strip_accents(lower(player_name)), '[^a-z]', '', 'g') as name_key
-    from {{ ref('stg_squads') }}
+    select * from {{ ref('stg_squads') }}
 ),
 
-values_ as (
-    select * from {{ ref('stg_player_values') }}
+vmap as (
+    select team_country, player_name, market_value_eur, photo_url
+    from player_value_map
 )
 
 select
@@ -23,10 +22,8 @@ select
     squad.birth_date,
     squad.age_years as age,
     v.market_value_eur,
-    v.market_value_str,
-    v.photo_url,
-    v.tm_player_id
+    v.photo_url
 from squad
-left join values_ as v
+left join vmap as v
     on squad.team_country = v.team_country
-    and squad.name_key = v.name_key
+    and squad.player_name = v.player_name

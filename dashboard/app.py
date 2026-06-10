@@ -52,7 +52,9 @@ with st.sidebar:
         "raw_squads": "Squads (raw)",
         "dim_player": "Players (dim)",
         "dim_national_team": "Teams (dim)",
-        "team_market_value": "Market values",
+        "group_standings": "Group standings",
+        "fct_fixture": "Fixtures",
+        "predicted_xi": "Predicted XIs",
         "fct_player_stats": "Hist. stats (mart)",
         "fct_match": "Matches",
     }
@@ -60,8 +62,9 @@ with st.sidebar:
         n = row_count(tbl)
         st.write(f"{'✅' if n else '⏳'} **{label}** — {n if n is not None else 'not built'}")
 
-tab_overview, tab_teams, tab_players, tab_history = st.tabs(
-    ["Overview", "Teams", "Players", "Historical"]
+(tab_overview, tab_groups, tab_schedule, tab_teams, tab_players, tab_lineup,
+ tab_history) = st.tabs(
+    ["Overview", "Groups", "Schedule", "Teams", "Players", "Lineup", "Historical"]
 )
 
 # ---------------------------------------------------------------- Overview
@@ -91,6 +94,58 @@ with tab_overview:
     else:
         st.info("Run the pipeline to populate players: "
                 "`dagster asset materialize -m wc2026.definitions --select raw_squads,dbt_marts`")
+
+# ---------------------------------------------------------------- Groups
+with tab_groups:
+    if table_exists("group_standings"):
+        gs = q("select * from group_standings")
+        st.caption("Standings update live as matches are played (pre-tournament = all zeros).")
+        letters = sorted(gs["group_letter"].unique())
+        # show groups in a 3-column grid
+        for i in range(0, len(letters), 3):
+            cols = st.columns(3)
+            for col, letter in zip(cols, letters[i:i + 3]):
+                with col:
+                    st.markdown(f"**Group {letter}**")
+                    grp = gs[gs["group_letter"] == letter][
+                        ["team_country", "played", "won", "drawn", "lost", "goal_diff", "points"]
+                    ].rename(columns={"team_country": "Team", "played": "P", "won": "W",
+                                      "drawn": "D", "lost": "L", "goal_diff": "GD", "points": "Pts"})
+                    st.dataframe(grp, hide_index=True, use_container_width=True)
+    else:
+        st.info("Group standings not built yet.")
+
+# ---------------------------------------------------------------- Schedule
+with tab_schedule:
+    if table_exists("fct_fixture"):
+        fx = q("select * from fct_fixture")
+        c1, c2 = st.columns(2)
+        grp_opts = ["All"] + sorted(fx["group_letter"].dropna().unique())
+        gpick = c1.selectbox("Group", grp_opts)
+        team_opts = ["All"] + sorted(set(fx["home_team"]) | set(fx["away_team"]))
+        tpick = c2.selectbox("Team", team_opts)
+        view = fx
+        if gpick != "All":
+            view = view[view["group_letter"] == gpick]
+        if tpick != "All":
+            view = view[(view["home_team"] == tpick) | (view["away_team"] == tpick)]
+        st.caption(f"{len(view)} matches")
+        st.dataframe(
+            view[["match_date", "kickoff_local", "group_letter", "home_team", "away_team",
+                  "home_score", "away_score", "venue", "status"]],
+            hide_index=True, use_container_width=True,
+            column_config={
+                "match_date": st.column_config.DateColumn("Date"),
+                "kickoff_local": st.column_config.TextColumn("Kickoff"),
+                "group_letter": st.column_config.TextColumn("Grp"),
+                "home_team": st.column_config.TextColumn("Home"),
+                "away_team": st.column_config.TextColumn("Away"),
+                "home_score": st.column_config.NumberColumn("H", format="%d"),
+                "away_score": st.column_config.NumberColumn("A", format="%d"),
+            },
+        )
+    else:
+        st.info("Schedule not built yet.")
 
 # ---------------------------------------------------------------- Teams
 with tab_teams:
@@ -154,6 +209,36 @@ with tab_players:
                      hide_index=True, use_container_width=True)
     else:
         st.info("Players not built yet.")
+
+# ---------------------------------------------------------------- Lineup
+with tab_lineup:
+    if table_exists("predicted_xi"):
+        teams = q("select distinct team_country from predicted_xi order by 1")["team_country"]
+        team = st.selectbox("National team", list(teams), key="lineup_team")
+        xi = q(
+            "select position, shirt_number, player_name, club, market_value_eur, photo_url, formation "
+            f"from predicted_xi where team_country = '{team.replace(chr(39), chr(39) * 2)}' "
+            "order by pos_rank, shirt_number"
+        )
+        formation_str = xi["formation"].iloc[0] if len(xi) else "?"
+        st.markdown(f"### {team} &nbsp;·&nbsp; `{formation_str}`")
+        st.caption("Predicted XI from the team's most recent friendly (replaced by real lineups once matches start).")
+
+        view = xi.assign(value_m=(xi["market_value_eur"] / 1e6).round(1))
+        st.dataframe(
+            view[["photo_url", "shirt_number", "position", "player_name", "club", "value_m"]],
+            use_container_width=True, hide_index=True,
+            column_config={
+                "photo_url": st.column_config.ImageColumn("Photo"),
+                "shirt_number": st.column_config.NumberColumn("#", format="%d"),
+                "position": st.column_config.TextColumn("Pos"),
+                "player_name": st.column_config.TextColumn("Player"),
+                "club": st.column_config.TextColumn("Club"),
+                "value_m": st.column_config.NumberColumn("Value (€m)", format="%.1f"),
+            },
+        )
+    else:
+        st.info("Lineups not built yet — run the raw_lineups asset + dbt build.")
 
 # ---------------------------------------------------------------- Historical
 with tab_history:
