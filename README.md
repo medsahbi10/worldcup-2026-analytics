@@ -1,83 +1,153 @@
-# World Cup 2026 — Analytics Pipeline
+# FIFA World Cup 2026 — Analytics
 
-End-to-end data + AI engineering project analyzing the FIFA World Cup 2026 on **two levels**:
+An end-to-end data + AI engineering project for the **FIFA World Cup 2026**: a Python
+pipeline builds a football warehouse, a Dixon-Coles model simulates the tournament,
+and a themed Next.js web app turns it into an interactive analytics hub — predictions,
+rankings, head-to-head history and insight dashboards.
 
-- **Players** — goals, xG, passes, tackles, minutes, ratings
-- **Teams** — results, possession, xG for/against, win probability, simulations
+**Live demo**
+- 🌐 Web app (Vercel): `https://<your-app>.vercel.app` &nbsp;←&nbsp; *replace with your Vercel URL*
+- ⚙️ API (Render): https://wc2026-api-kinp.onrender.com/api/health
+
+> The data is pre-tournament; results, standings and form fill in as matches are played.
+
+---
+
+## Screenshots
+
+| Landing — next match & must-watch | Groups (draw + qualification odds) |
+|---|---|
+| ![Landing](docs/img/landing.png) | ![Groups](docs/img/groups.png) |
+
+| Insight dashboard (title race · attacks · defenses) | Match comparison modal (prediction · H2H) |
+|---|---|
+| ![Insights](docs/img/insights.png) | ![Match modal](docs/img/match-modal.png) |
+
+---
+
+## Features
+
+- **Landing dashboard** — next match + must-watch fixtures, **title race**, **punching above their weight** (Elo vs squad-value, dumbbell chart), **lethal attacks / meanest defenses**, **star power**, **form guide**, **dark horses** and the **group of death**.
+- **Groups** — the 2026 draw as colour-coded cards with **qualification odds** (Advance / QF) per team and an expandable standings table.
+- **Knockout bracket** — the official R32 → Final slot template.
+- **Schedule** — fixtures grouped by matchday, kickoff times shown in **Tunisia (UTC+1)**.
+- **World ranking** — every nation ranked by **Elo / champion odds / squad value / attack / defense** (switchable).
+- **Teams & team pages** — squad value, model strength, WC history, coach, top players.
+- **Match comparison modal** — model prediction (W/D/L + xG), all-time **head-to-head**, World Cup meetings, and FlashScore-style stat bars.
+- Offline-bundled flags & kits, the FWC2026 display font, and a trophy page transition.
+
+---
+
+## Design
+
+Built from a **FIFA World Cup 2026 Figma design system** — royal-blue boards, neon
+per-group colours, white "flag container" tiles with the signature diagonal corners,
+and dark insight surfaces.
+
+- **Fonts:** `FWC2026` (display) + `Noto Sans` (body) — *Free for Personal Use.*
+- **Palette, components and screens** were matched from Figma Dev-Mode specs.
+
+> Figma source: `<add your Figma link here>`
+
+---
 
 ## Architecture
 
 ```
-   Sources         StatsBomb open data │ soccerdata/FBref │ football-data.org
-                          │                    │                  │
-   Ingestion (Python) ────┴────────────────────┴──────────────────┘
-                          ▼
-   Orchestration     Dagster  ── owns the asset graph, deps, retries
-                          ▼
-   Warehouse         DuckDB (local file)  ⇄  MotherDuck (cloud, for CI)
-                          ▼
-   Transform         dbt  ── staging → marts (dim_team, fct_match, ...)
-                          ▼
-            ┌─────────────┴─────────────┐
-            ▼                           ▼
-   ML models (Poisson/XGBoost)   Streamlit dashboard (Players / Teams)
+  Sources        FBref · Transfermarkt · martj42 international results
+                        │
+  Pipeline (Python) ────┘     Dagster orchestration → dbt transforms
+                        ▼
+  Warehouse        DuckDB (local file)  ⇄  MotherDuck (cloud, CI)
+                        ▼
+  Model            Dixon-Coles + squad-value prior · 20k Monte-Carlo sims
+                        ▼
+  API (FastAPI)    read-only JSON over the marts  ──►  Render
+                        ▼
+  Web (Next.js 16) themed analytics UI            ──►  Vercel
 ```
 
-### Local vs. cloud
-The warehouse target is chosen by environment variable, so the **same code** runs
-both locally and in GitHub Actions:
+**Tech stack:** Next.js 16 · React 19 · Tailwind v4 · TypeScript · FastAPI · DuckDB ·
+dbt · Dagster · pandas · Python 3.11.
 
-| `WC_ENV`   | Target                         | Used for                |
-|------------|--------------------------------|-------------------------|
-| *(unset)*  | local DuckDB file `data/`      | development             |
-| `cloud`    | MotherDuck (`md:`)             | GitHub Actions (state persists between runs) |
+---
 
-## Quickstart
+## Local development
+
+**1. Backend API** (Python)
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
-
-# 1. Run the pipeline (seeds sample data, runs dbt)
-dagster asset materialize -m wc2026.definitions --select "*"
-
-# 2. Explore in the Dagster UI
-dagster dev -m wc2026.definitions
-
-# 3. Launch the themed dashboard (Overview / Predictions / Groups / Schedule /
-#    Teams / Players / Lineup / Historical / Guide) — with flags & scoreboards
-streamlit run dashboard/app.py
+pip install -r requirements-api.txt          # slim runtime deps
+$env:PYTHONPATH = "src"
+uvicorn wc2026.api:app --reload --port 8000   # → http://localhost:8000/api/health
 ```
 
-See **[GUIDE.md](GUIDE.md)** (or the in-app **📖 Guide** tab) for a full walkthrough.
+> Rebuilding the warehouse from scratch (Dagster + dbt) uses the full deps:
+> `pip install -e ".[dev]"` then `dagster asset materialize -m wc2026.definitions --select "*"`.
+
+**2. Frontend** (Next.js)
+
+```powershell
+cd frontend
+npm install
+npm run dev                                   # → http://localhost:3000
+```
+
+The frontend reads `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:8000`); set it in
+`frontend/.env.local` to point elsewhere.
+
+---
+
+## Deployment
+
+The app is split across two free hosts. Full click-by-click is in **[DEPLOY.md](DEPLOY.md)**.
+
+**Backend → Render** (read-only FastAPI + the committed 8.5 MB DuckDB)
+1. Render → **New → Blueprint** → pick this repo. It reads [`render.yaml`](render.yaml) and
+   builds from [`requirements-api.txt`](requirements-api.txt).
+2. Deploy → grab the URL → verify `/api/health`.
+
+**Frontend → Vercel** (Next.js)
+1. Import the repo, set **Root Directory = `frontend`**.
+2. Add env var `NEXT_PUBLIC_API_URL` = your Render URL (no trailing slash).
+3. Deploy. Every push to `main` then auto-redeploys.
+
+> Render's free tier sleeps when idle, so the first request after a nap is a ~30–60 s cold start.
+
+---
 
 ## Project layout
 
 ```
-src/wc2026/          Python package: config, ingestion, Dagster defs
-  config.py          DuckDB/MotherDuck connection switching
-  seed.py            Sample historical matches (Phase 0 smoke test)
-  definitions.py     Dagster assets (raw → dbt marts)
-dbt/                 dbt project (staging → marts)
-dashboard/app.py     Streamlit explorer
-models/              ML models (Phase 2)
-tests/               pytest
-.github/workflows/   ci.yml (lint+test) · daily-ingest.yml (cron → MotherDuck)
+frontend/              Next.js 16 web app
+  app/                 routes: landing, groups, bracket, schedule, ranking, teams, players
+  components/          MatchCard, GroupCard, RankingList, charts, brand primitives, modal
+  lib/                 typed API client, insights, timezone, WC-history reference data
+  public/brand/        bundled flags (SVG), kits, fonts, logos
+src/wc2026/            Python package
+  api.py               FastAPI read-only service (teams, groups, fixtures, predictions,
+                       strengths, players, h2h, form, predict)
+  config.py            DuckDB / MotherDuck connection switching
+  models/              Dixon-Coles model + Monte-Carlo simulation
+  branding.py          flag ISO mapping
+dbt/                   dbt project (staging → marts)
+data/wc2026.duckdb     prebuilt read-only warehouse (committed for the deployed API)
+render.yaml            Render Blueprint (backend)
+DEPLOY.md              deployment guide
 ```
 
-## Roadmap
-
-- [x] **Phase 0** — Scaffold: runnable vertical slice on sample data
-- [x] **Phase 1** — Player & team ingest: 2026 squads (FBref) + historical stats → `dim_player`, `team_squad_summary`, `fct_player_stats`
-- [ ] **Phase 2** — Models: match-outcome predictor + Monte-Carlo bracket simulation
-- [ ] **Phase 3** — Live ingestion (player match stats fill from June 11) via Dagster + GitHub Actions cron
-- [ ] **Phase 4** — Dashboard polish + retrospective report
+---
 
 ## Data sources (all free)
 
-- [`soccerdata`](https://github.com/probberechts/soccerdata) → **FBref** (`INT-World Cup`) — our primary source:
-  - **2026 squads**: scraped per-team via the Cloudflare-bypassing driver (`fb.get`), since
-    soccerdata has no roster endpoint. Team URLs auto-discovered from the competition page.
-  - **Historical/live player stats**: `read_player_season_stats` (2022 now; 2026 fills as matches play).
-- [football-data.org](https://www.football-data.org/) — free fixtures/scores API (Phase 3, live)
+- **FBref** via [`soccerdata`](https://github.com/probberechts/soccerdata) — squads & player stats
+- **Transfermarkt** — market values
+- **martj42 international results** — 49k+ historical internationals (head-to-head & form)
+- Flags by [`flag-icons`](https://github.com/lipis/flag-icons)
+
+## Notes
+
+- The `FWC2026` / `fifa-26` fonts are **Free for Personal Use** — check licensing before any commercial deployment.
+- Built by **Mohamed Sahbi Ben Rejeb**.
