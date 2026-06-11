@@ -1,25 +1,37 @@
 import type { Metadata } from "next";
-import { Oswald, Inter } from "next/font/google";
+import { Noto_Sans, Archivo } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
+import { RouteTransition } from "@/components/RouteTransition";
 
-const display = Oswald({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-oswald" });
-const body = Inter({ subsets: ["latin"], variable: "--font-inter" });
+// Body = Noto Sans (the Figma body font).
+const body = Noto_Sans({ subsets: ["latin"], variable: "--font-noto" });
+// Fallback display face for FWC2026 until brand/fwc2026.woff2 is dropped in.
+const display = Archivo({ subsets: ["latin"], weight: ["600", "700", "800", "900"], variable: "--font-archivo" });
 
 export const metadata: Metadata = {
-  title: "World Cup 2026 — Analytics",
-  description: "Squads, groups, schedule, market values and model forecasts for the FIFA World Cup 2026.",
+  title: "FIFA World Cup 2026 — Analytics",
+  description: "Squads, groups, schedule, the knockout bracket, market values and model forecasts for the FIFA World Cup 2026.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable} antialiased`}>
       <body className="min-h-screen">
+        <RouteTransition />
         <Nav />
         <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
-        <footer className="mx-auto max-w-6xl px-4 py-10 text-xs text-muted">
-          Data: FBref · Transfermarkt · martj42 international results · flags by flagcdn.
-          Model: Dixon-Coles + squad-value prior, 20k Monte-Carlo simulations.
+        <footer className="mt-10 border-t border-border">
+          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-8 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="font-display text-sm font-extrabold text-text">FIFA WORLD CUP 2026 · ANALYTICS</div>
+              <div className="mt-1">48 teams · 104 matches · USA · Mexico · Canada</div>
+            </div>
+            <div className="sm:text-right">
+              Data: FBref · Transfermarkt · martj42 · flags by flag-icons.<br />
+              Model: Dixon-Coles + squad-value prior · 20k Monte-Carlo sims.
+            </div>
+          </div>
         </footer>
       </body>
     </html>

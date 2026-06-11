@@ -171,3 +171,79 @@ def historical() -> list[dict]:
         "select player_name, team, goals, assists, minutes, goals_per90 "
         "from fct_player_stats order by goals desc nulls last limit 25"
     )
+
+
+def _num(x: object) -> int | None:
+    if x is None or (isinstance(x, float) and math.isnan(x)):
+        return None
+    return int(x)
+
+
+@app.get("/api/h2h")
+def h2h(home: str = Query(...), away: str = Query(...)) -> dict:
+    """All-time head-to-head + World Cup meetings between two nations,
+    from the 49k international results. Record is from `home`'s perspective."""
+    matches = rows(
+        "select cast(date as varchar) as date, home_team, away_team, "
+        "home_score, away_score, tournament, neutral "
+        "from raw_intl_results "
+        "where (home_team = ? and away_team = ?) or (home_team = ? and away_team = ?) "
+        "order by date desc",
+        [home, away, away, home],
+    )
+    w = d = l = gf = ga = 0
+    for m in matches:
+        hs, as_ = _num(m.get("home_score")), _num(m.get("away_score"))
+        m["home_score"], m["away_score"] = hs, as_
+        if hs is None or as_ is None:
+            continue
+        mine, theirs = (hs, as_) if m["home_team"] == home else (as_, hs)
+        gf += mine
+        ga += theirs
+        if mine > theirs:
+            w += 1
+        elif mine == theirs:
+            d += 1
+        else:
+            l += 1
+    wc = [m for m in matches if m.get("tournament") == "FIFA World Cup"]
+    return {
+        "home": home,
+        "away": away,
+        "played": w + d + l,
+        "home_wins": w,
+        "draws": d,
+        "away_wins": l,
+        "home_goals": gf,
+        "away_goals": ga,
+        "wc_count": len(wc),
+        "recent": matches[:8],
+        "wc_meetings": wc[:8],
+    }
+
+
+@app.get("/api/form")
+def form(n: int = 5) -> dict:
+    """Last `n` international results (W/D/L) for every qualified nation."""
+    teams = {r["team_country"] for r in rows("select team_country from dim_national_team")}
+    res = rows(
+        "select cast(date as varchar) as date, home_team, away_team, home_score, away_score "
+        "from raw_intl_results "
+        "where home_score is not null and away_score is not null and date >= '2023-01-01' "
+        "order by date desc"
+    )
+    out: dict[str, list] = {t: [] for t in teams}
+    for m in res:
+        hs, as_ = _num(m.get("home_score")), _num(m.get("away_score"))
+        if hs is None or as_ is None:
+            continue
+        for team, gf, ga, opp in (
+            (m["home_team"], hs, as_, m["away_team"]),
+            (m["away_team"], as_, hs, m["home_team"]),
+        ):
+            if team in teams and len(out[team]) < n:
+                out[team].append({
+                    "result": "W" if gf > ga else ("D" if gf == ga else "L"),
+                    "gf": gf, "ga": ga, "opponent": opp, "date": m["date"],
+                })
+    return out

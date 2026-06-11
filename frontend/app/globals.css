@@ -1,42 +1,73 @@
 @import "tailwindcss";
 
-/* ------------------------------------------------------------------ *
- * Theme tokens — swap these hex values to match the Figma WC theme.   *
- * Everything else (components, pages) reads from these tokens.        *
- * ------------------------------------------------------------------ */
+/* ==================================================================== *
+ * FIFA World Cup 2026 — design system, reskinned from the Figma boards. *
+ * Body = Noto Sans · Display = FWC2026 (local, graceful fallback).      *
+ * Palette = royal blue base, lime + gold accents, 12 neon group colors. *
+ * ==================================================================== */
+
+/* --- Display font: drop frontend/public/brand/fwc2026.woff2 to enable. *
+ *     Until then the stack falls through to the bundled Archivo.         */
+@font-face {
+  font-family: "FWC2026";
+  src: url("/brand/fwc2026.ttf") format("truetype");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 @theme {
-  --color-bg: #0a1124;
-  --color-surface: #121c34;
-  --color-surface2: #1a2742;
-  --color-border: #243456;
-  --color-primary: #e4002b;
-  --color-accent: #ffc72c;
-  --color-pitch: #18a558;
-  --color-text: #eef2fb;
-  --color-muted: #93a4c4;
+  /* base surfaces — deep royal navy that reads "blue" but stays readable */
+  --color-bg: #0f1014;
+  --color-surface: #181a21;
+  --color-surface2: #20232c;
+  --color-border: #2e323e;
 
-  --font-display: var(--font-oswald), system-ui, sans-serif;
-  --font-body: var(--font-inter), system-ui, sans-serif;
+  /* showcase royal blue (bracket / teams / flags boards) */
+  --color-royal: #0a84ff;
+  --color-royal-deep: #0040b0;
 
-  --radius-card: 14px;
+  /* brand action + accents */
+  --color-primary: #0a84ff;   /* primary blue */
+  --color-accent: #ffd346;    /* yellow — highlights, links, CTAs */
+  --color-gold: #ffc72c;      /* trophy gold — FINAL highlight */
+  --color-win: #34c759;       /* secondary-green — win / advancing */
+  --color-loss: #f43056;      /* secondary-red — loss / away */
+
+  --color-text: #f2f3f7;
+  --color-muted: #8e90a2;
+
+  --font-display: "FWC2026", var(--font-archivo), system-ui, sans-serif;
+  --font-body: var(--font-noto), system-ui, sans-serif;
+
+  --radius-card: 16px;
 }
 
 html, body {
-  background: var(--color-bg);
+  background-color: var(--color-bg);
+  /* geometric board — drop frontend/public/brand/background.png to enable.
+     If absent the 404'd image is simply ignored and the bg color shows. */
+  background-image:
+    radial-gradient(1200px 600px at 80% -10%, rgba(10,132,255,0.30), transparent 60%),
+    url("/brand/background.png");
+  background-attachment: fixed;
+  background-size: cover;
+  background-position: top center;
   color: var(--color-text);
   font-family: var(--font-body);
 }
 
 h1, h2, h3, h4 {
   font-family: var(--font-display);
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
-/* utility component classes */
+/* ---- utility component classes ------------------------------------- */
 .wc-card {
-  background: var(--color-surface);
+  background: color-mix(in oklab, var(--color-surface) 92%, transparent);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
+  backdrop-filter: blur(6px);
 }
 .wc-chip {
   background: var(--color-surface2);
@@ -46,5 +77,76 @@ h1, h2, h3, h4 {
   font-size: 12px;
   color: var(--color-muted);
 }
+/* dark rounded score box (the Figma match cards) */
+.wc-score {
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: #06122e;
+  border: 1px solid var(--color-border);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1;
+}
+/* flag container (Figma: 144×96, border 2px #F7F7F8, radius 24px 0px).
+   size, border, radius and bg are set inline by <FlagCard>; overflow clips
+   the flag to the diagonal-rounded shape. */
+.wc-flagcard {
+  display: inline-block;
+  box-sizing: border-box;
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+/* ---- route transition: trophy sweeps across a royal wipe --------------- */
+.route-trans {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  overflow: hidden;
+}
+.route-trans__wipe {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 100% at 50% 50%, var(--color-royal), var(--color-royal-deep));
+  animation: wipe 0.9s ease-in-out forwards;
+}
+.route-trans__trophy {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: min(46vh, 320px);
+  width: auto;
+  filter: drop-shadow(0 16px 40px rgba(0,0,0,0.5));
+  animation: trophy-pass 0.9s cubic-bezier(0.6, 0, 0.2, 1) forwards;
+}
+@keyframes wipe {
+  0%   { clip-path: inset(0 100% 0 0); }
+  40%  { clip-path: inset(0 0 0 0); }
+  60%  { clip-path: inset(0 0 0 0); }
+  100% { clip-path: inset(0 0 0 100%); }
+}
+@keyframes trophy-pass {
+  0%   { transform: translate(-160%, -50%) rotate(-12deg); opacity: 0; }
+  35%  { transform: translate(-50%, -50%) rotate(0deg); opacity: 1; }
+  65%  { transform: translate(-50%, -50%) rotate(0deg); opacity: 1; }
+  100% { transform: translate(180%, -50%) rotate(12deg); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-trans { display: none; }
+}
+
+/* royal-blue showcase board wrapper (bracket / teams) */
+.wc-board {
+  background:
+    radial-gradient(900px 500px at 50% -10%, var(--color-royal), var(--color-royal-deep));
+  border-radius: var(--radius-card);
+}
+
 ::-webkit-scrollbar { height: 8px; width: 8px; }
 ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 8px; }

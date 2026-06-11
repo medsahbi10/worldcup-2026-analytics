@@ -29,7 +29,7 @@ export default function PlayersPage() {
         <div className="flex gap-1">
           {POS.map((p) => (
             <button key={p} onClick={() => setPos(p)}
-              className={`rounded-md px-3 py-2 text-sm font-display ${pos === p ? "bg-primary text-white" : "bg-surface2 text-muted"}`}>
+              className={`rounded-md px-3 py-2 text-sm font-display font-bold uppercase ${pos === p ? "bg-accent text-[#08163a]" : "bg-surface2 text-muted"}`}>
               {p}
             </button>
           ))}

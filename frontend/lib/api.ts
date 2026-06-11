@@ -53,6 +53,11 @@ export interface LineupRow {
   formation: string;
 }
 
+export interface HistoricalStat {
+  player_name: string; team: string;
+  goals: number; assists: number; minutes: number; goals_per90: number;
+}
+
 export interface Prediction {
   team_country: string;
   p_advance: number; p_r16: number; p_qf: number; p_sf: number;
@@ -64,6 +69,27 @@ export interface MatchPrediction {
   p_home: number; p_draw: number; p_away: number;
   xg_home: number; xg_away: number;
   home_flag: string; away_flag: string;
+}
+
+export interface H2HMatch {
+  date: string; home_team: string; away_team: string;
+  home_score: number | null; away_score: number | null; tournament: string; neutral: boolean;
+}
+
+export interface H2H {
+  home: string; away: string; played: number;
+  home_wins: number; draws: number; away_wins: number;
+  home_goals: number; away_goals: number; wc_count: number;
+  recent: H2HMatch[]; wc_meetings: H2HMatch[];
+}
+
+export interface Strength {
+  team_country: string; attack: number; defense: number; overall: number;
+  elo: number | null; total_value_m: number | null; flag: string; flag_iso: string | null;
+}
+
+export interface FormResult {
+  result: "W" | "D" | "L"; gf: number; ga: number; opponent: string; date: string;
 }
 
 export const api = {
@@ -83,7 +109,11 @@ export const api = {
   },
   lineup: (team: string) => get<LineupRow[]>(`/api/lineup/${encodeURIComponent(team)}`),
   predictions: () => get<Prediction[]>("/api/predictions"),
-  strengths: () => get<Team[]>("/api/strengths"),
+  historical: () => get<HistoricalStat[]>("/api/historical"),
+  strengths: () => get<Strength[]>("/api/strengths"),
   predict: (home: string, away: string) =>
     get<MatchPrediction>(`/api/predict?home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`),
+  h2h: (home: string, away: string) =>
+    get<H2H>(`/api/h2h?home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`),
+  form: () => get<Record<string, FormResult[]>>("/api/form"),
 };
