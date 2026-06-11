@@ -1,0 +1,8 @@
+# Slim runtime deps for the read-only FastAPI service (wc2026.api:app).
+# Deliberately excludes the heavy pipeline (dagster/dbt/streamlit/ml) — the API
+# only reads the prebuilt DuckDB file.
+fastapi>=0.110
+uvicorn[standard]>=0.27
+duckdb>=1.0
+pandas>=2.2
+python-dotenv>=1.0

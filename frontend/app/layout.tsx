@@ -26,6 +26,17 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <div>
               <div className="font-display text-sm font-extrabold text-text">FIFA WORLD CUP 2026 · ANALYTICS</div>
               <div className="mt-1">48 teams · 104 matches · USA · Mexico · Canada</div>
+              <div className="mt-1.5">
+                Built by <span className="font-semibold text-text">Mohamed Sahbi Ben Rejeb</span> ·{" "}
+                <a
+                  href="https://github.com/medsahbi10/worldcup-2026-analytics"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold text-accent hover:underline"
+                >
+                  github.com/medsahbi10/worldcup-2026-analytics ↗
+                </a>
+              </div>
             </div>
             <div className="sm:text-right">
               Data: FBref · Transfermarkt · martj42 · flags by flag-icons.<br />

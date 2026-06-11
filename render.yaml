@@ -1,0 +1,16 @@
+# Render Blueprint — deploys the read-only WC2026 API.
+# Render → New → Blueprint → pick this repo. The 8.5 MB DuckDB file is committed,
+# and wc2026/config.py finds it by relative path, so no extra config is needed.
+services:
+  - type: web
+    name: wc2026-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-api.txt
+    startCommand: uvicorn wc2026.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHONPATH
+        value: src
+      - key: PYTHON_VERSION
+        value: "3.11.9"
