@@ -5,6 +5,9 @@ data/**/*.parquet
 data/charts/
 *.duckdb
 *.duckdb.wal
+# Exception: the prebuilt read-only warehouse is committed so the deployed
+# API (Render) has data without a separate pipeline run. Keep it small.
+!data/wc2026.duckdb
 
 # Python
 __pycache__/
