@@ -19,6 +19,8 @@ dependencies = [
     "matplotlib>=3.8",
     "scipy>=1.11",
     "rapidfuzz>=3.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
 ]
 
 [project.optional-dependencies]

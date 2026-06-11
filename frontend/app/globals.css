@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ *
+ * Theme tokens — swap these hex values to match the Figma WC theme.   *
+ * Everything else (components, pages) reads from these tokens.        *
+ * ------------------------------------------------------------------ */
+@theme {
+  --color-bg: #0a1124;
+  --color-surface: #121c34;
+  --color-surface2: #1a2742;
+  --color-border: #243456;
+  --color-primary: #e4002b;
+  --color-accent: #ffc72c;
+  --color-pitch: #18a558;
+  --color-text: #eef2fb;
+  --color-muted: #93a4c4;
+
+  --font-display: var(--font-oswald), system-ui, sans-serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+
+  --radius-card: 14px;
+}
+
+html, body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  letter-spacing: 0.4px;
+}
+
+/* utility component classes */
+.wc-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+.wc-chip {
+  background: var(--color-surface2);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+::-webkit-scrollbar { height: 8px; width: 8px; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 8px; }
