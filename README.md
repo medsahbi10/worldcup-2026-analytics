@@ -6,7 +6,7 @@ and a themed Next.js web app turns it into an interactive analytics hub — pred
 rankings, head-to-head history and insight dashboards.
 
 **Live demo**
-- 🌐 Web app (Vercel): `https://<your-app>.vercel.app` &nbsp;←&nbsp; *replace with your Vercel URL*
+- 🌐 **Web app (Vercel): https://worldcup-2026-analytics.vercel.app**
 - ⚙️ API (Render): https://wc2026-api-kinp.onrender.com/api/health
 
 > The data is pre-tournament; results, standings and form fill in as matches are played.
@@ -47,7 +47,7 @@ and dark insight surfaces.
 - **Fonts:** `FWC2026` (display) + `Noto Sans` (body) — *Free for Personal Use.*
 - **Palette, components and screens** were matched from Figma Dev-Mode specs.
 
-> Figma source: `<add your Figma link here>`
+> Figma source: [FIFA World Cup 2026 — Community](https://www.figma.com/design/rti3tkIgUUVlgv8dwrTIdt/FIFA-World-Cup-2026--Community-?node-id=361-536404)
 
 ---
 
