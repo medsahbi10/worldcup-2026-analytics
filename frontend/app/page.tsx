@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { api, type Fixture, type FormResult } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
@@ -44,6 +45,35 @@ const fx = (f: Fixture) => ({
   homeScore: f.home_score, awayScore: f.away_score, status: f.status,
 });
 
+/** Finished-match results: same MatchCard template (score in the box), 3 shown,
+ *  expandable. Each card opens the match-detail modal in result mode. */
+function ResultsSection({ played }: { played: Fixture[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const shown = expanded ? played : played.slice(0, 3);
+  return (
+    <section>
+      <Head title="Results" sub="Finished matches — click any for the result breakdown vs our prediction." />
+      {played.length === 0 ? (
+        <div className="wc-card p-6 text-sm text-muted">No results yet — the group stage has just kicked off.</div>
+      ) : (
+        <>
+          <div className="space-y-4">
+            {shown.map((m, i) => <MatchCard key={i} {...fx(m)} />)}
+          </div>
+          {played.length > 3 && (
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              className="mt-3 font-display text-sm font-bold uppercase text-accent hover:underline"
+            >
+              {expanded ? "Show less" : `Show all ${played.length} results`}
+            </button>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function Home() {
   const fixtures = useApi(() => api.fixtures(), []);
   const teams = useApi(() => api.teams(), []);
@@ -60,6 +90,9 @@ export default function Home() {
     .sort((a, b) => (valOf.get(b.home_team)! + valOf.get(b.away_team)!) - (valOf.get(a.home_team)! + valOf.get(a.away_team)!))
     .filter((m) => m !== nextMatch)
     .slice(0, 3);
+  const results = [...(fixtures.data ?? [])]
+    .filter((f) => f.status === "played")
+    .sort((a, b) => b.match_date.localeCompare(a.match_date) || (b.kickoff_local ?? "").localeCompare(a.kickoff_local ?? ""));
 
   const titleRace = [...(preds.data ?? [])].sort((a, b) => b.p_champion - a.p_champion).slice(0, 10)
     .map((p) => ({ team_country: p.team_country, flag: p.flag, value: `${(p.p_champion * 100).toFixed(1)}%` }));
@@ -102,13 +135,21 @@ export default function Home() {
         </div>
       </div>
 
-      {/* NEXT MATCH + MUST-WATCH */}
+      {/* NEXT MATCH */}
       <section>
-        <Head title="Next match & must-watch" sub="Upcoming fixtures — click any match for the full comparison." />
+        <Head title="Next match" sub="The next kickoff — click for the full comparison." />
         {fixtures.loading && <Spinner />}
         {fixtures.error && <ApiError msg={fixtures.error} />}
+        {nextMatch && <MatchCard {...fx(nextMatch)} />}
+      </section>
+
+      {/* RESULTS (between next match and must-watch) */}
+      {fixtures.data && <ResultsSection played={results} />}
+
+      {/* MUST-WATCH */}
+      <section>
+        <Head title="Must-watch fixtures" sub="The biggest upcoming clashes by squad value." />
         <div className="space-y-4">
-          {nextMatch && <MatchCard {...fx(nextMatch)} />}
           {mustWatch.map((m, i) => <MatchCard key={i} {...fx(m)} />)}
         </div>
       </section>

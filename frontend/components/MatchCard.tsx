@@ -114,7 +114,11 @@ export function MatchCard({
       </div>
     </div>
     {open && (
-      <MatchModal home={home} away={away} homeFlag={homeFlag} awayFlag={awayFlag} onClose={() => setOpen(false)} />
+      <MatchModal
+        home={home} away={away} homeFlag={homeFlag} awayFlag={awayFlag}
+        group={group} homeScore={homeScore} awayScore={awayScore} status={status}
+        onClose={() => setOpen(false)}
+      />
     )}
     </>
   );
