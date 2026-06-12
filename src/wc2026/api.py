@@ -191,7 +191,7 @@ def h2h(home: str = Query(...), away: str = Query(...)) -> dict:
         "order by date desc",
         [home, away, away, home],
     )
-    w = d = l = gf = ga = 0
+    w = d = lost = gf = ga = 0
     for m in matches:
         hs, as_ = _num(m.get("home_score")), _num(m.get("away_score"))
         m["home_score"], m["away_score"] = hs, as_
@@ -205,15 +205,15 @@ def h2h(home: str = Query(...), away: str = Query(...)) -> dict:
         elif mine == theirs:
             d += 1
         else:
-            l += 1
+            lost += 1
     wc = [m for m in matches if m.get("tournament") == "FIFA World Cup"]
     return {
         "home": home,
         "away": away,
-        "played": w + d + l,
+        "played": w + d + lost,
         "home_wins": w,
         "draws": d,
-        "away_wins": l,
+        "away_wins": lost,
         "home_goals": gf,
         "away_goals": ga,
         "wc_count": len(wc),

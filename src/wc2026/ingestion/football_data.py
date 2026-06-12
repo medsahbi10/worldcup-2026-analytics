@@ -136,10 +136,17 @@ def _recompute_standings(con: duckdb.DuckDBPyConnection, membership: dict[str, s
             continue
         for team, gf, ga in ((home, hs, as_), (away, as_, hs)):
             s = stats[team]
-            s["mp"] += 1; s["gf"] += gf; s["ga"] += ga
-            if gf > ga: s["w"] += 1; s["pts"] += 3
-            elif gf == ga: s["d"] += 1; s["pts"] += 1
-            else: s["ll"] += 1
+            s["mp"] += 1
+            s["gf"] += gf
+            s["ga"] += ga
+            if gf > ga:
+                s["w"] += 1
+                s["pts"] += 3
+            elif gf == ga:
+                s["d"] += 1
+                s["pts"] += 1
+            else:
+                s["ll"] += 1
 
     rows = []
     for grp in sorted(set(membership.values())):
